@@ -1,0 +1,19 @@
+{
+  "name": "FretMaster - Teoria Musical para Violão e Guitarra",
+  "short_name": "FretMaster",
+  "description": "App interativo de aprendizado de teoria musical, braço do instrumento, escalas, modos gregos, CAGED, campo harmônico, treino de ouvido e professor IA para violão e guitarra.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0f172a",
+  "theme_color": "#d97706",
+  "orientation": "any",
+  "categories": ["education", "music", "utilities"],
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "192x192 512x512 any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

@@ -1,0 +1,8 @@
+{
+  "name": "Teoria Musical para Violão e Guitarra",
+  "description": "App interativo de aprendizado de teoria musical, braço do instrumento, escalas, modos gregos, CAGED, campo harmônico, treino de ouvido e professor IA para violão e guitarra.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

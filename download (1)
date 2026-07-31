@@ -1,0 +1,1262 @@
+/**
+ * @license
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+import { getNoteAtFret, NOTE_TO_SEMITONE } from './musicTheory';
+
+export interface ChordTypeDefinition {
+  id: string;
+  namePt: string;
+  suffix: string;
+  formula: string;
+  intervals: number[]; // semitone distances from root
+  descriptionPt: string;
+  moodPt: string;
+  genrePt: string;
+}
+
+export const CHORD_TYPES: ChordTypeDefinition[] = [
+  {
+    id: 'maior',
+    namePt: 'Maior (M)',
+    suffix: '',
+    formula: '1 - 3 - 5',
+    intervals: [0, 4, 7],
+    descriptionPt: 'A tríade fundamental perfeita maior. Formada por Tônica, 3ª Maior e 5ª Justa. Transmite clareza, resolução e luz.',
+    moodPt: 'Alegre, Estável, Afirmativo, Repouso',
+    genrePt: 'Todos os estilos musicais (Pop, Rock, MPB, Folk, Sertanejo)',
+  },
+  {
+    id: 'menor',
+    namePt: 'Menor (m)',
+    suffix: 'm',
+    formula: '1 - b3 - 5',
+    intervals: [0, 3, 7],
+    descriptionPt: 'A tríade fundamental menor. A substituição da 3ª Maior pela 3ª Menor (b3) confere uma sensação introspectiva e emotiva.',
+    moodPt: 'Emocional, Melancólico, Introspectivo, Dramático',
+    genrePt: 'MPB, Rock, Blues, Bossa Nova, Clássico',
+  },
+  {
+    id: 'dom7',
+    namePt: 'Dominante (7)',
+    suffix: '7',
+    formula: '1 - 3 - 5 - b7',
+    intervals: [0, 4, 7, 10],
+    descriptionPt: 'Acorde maior com a adição da 7ª Menor (b7). Gera o trítono entre a 3ª e a 7ª, criando tensão e impulso de resolução.',
+    moodPt: 'Tenso, Bluesy, Dinâmico, Convidativo',
+    genrePt: 'Blues, Rock Clássico, Baião, Samba, Funk',
+  },
+  {
+    id: 'maj7',
+    namePt: 'Sétima Maior (7M / maj7)',
+    suffix: 'maj7',
+    formula: '1 - 3 - 5 - 7',
+    intervals: [0, 4, 7, 11],
+    descriptionPt: 'Acorde maior com a 7ª Maior (7). Sua sonoridade é rica, elegante, suavemente dissonante e sofisticada.',
+    moodPt: 'Sofisticado, Aveludado, Repousante, Jazzístico',
+    genrePt: 'Bossa Nova, Jazz, Neo-Soul, MPB, Lo-fi',
+  },
+  {
+    id: 'm7',
+    namePt: 'Menor com Sétima (m7)',
+    suffix: 'm7',
+    formula: '1 - b3 - 5 - b7',
+    intervals: [0, 3, 7, 10],
+    descriptionPt: 'Acorde menor acrescido da 7ª Menor. Suaviza a melancolia da tríade menor, trazendo um balanço urbano e relaxado.',
+    moodPt: 'Relaxado, Groove, Noturno, Suave',
+    genrePt: 'R&B, Bossa Nova, Jazz, Pop, Reggae',
+  },
+  {
+    id: 'sus4',
+    namePt: 'Suspenso 4 (sus4)',
+    suffix: 'sus4',
+    formula: '1 - 4 - 5',
+    intervals: [0, 5, 7],
+    descriptionPt: 'A 3ª é substituída pela 4ª Justa. Não é nem maior nem menor, criando uma sensação flutuante e de expectativa de resolução para a 3ª.',
+    moodPt: 'Suspenso, Aberto, Cinemático, Misterioso',
+    genrePt: 'Rock, Pop, Gospel, Música Celta, MPB',
+  },
+  {
+    id: 'add9',
+    namePt: 'Com Nona (add9 / 9)',
+    suffix: 'add9',
+    formula: '1 - 3 - 5 - 9',
+    intervals: [0, 4, 7, 14],
+    descriptionPt: 'A tríade maior enriquecida pelo intervalo de 9ª Maior (2ª na oitava acima). Adiciona brilho acústico e profundidade sem tensão excessiva.',
+    moodPt: 'Brilhante, Espaçoso, Acústico, Poético',
+    genrePt: 'Violão Fingerstyle, Pop Rock, Ballads, MPB',
+  },
+  {
+    id: 'm7b5',
+    namePt: 'Meio Diminuto (m7b5)',
+    suffix: 'm7b5',
+    formula: '1 - b3 - b5 - b7',
+    intervals: [0, 3, 6, 10],
+    descriptionPt: 'Acorde do VII grau do campo harmônico maior. Combina 3ª menor, 5ª diminuta (b5) e 7ª menor. Sensação agridoce e preparatória.',
+    moodPt: 'Agridoce, Dissonante, Preparatório, Elegante',
+    genrePt: 'Bossa Nova, Jazz, Choro, MPB',
+  },
+  {
+    id: 'dim',
+    namePt: 'Diminuto (dim / °)',
+    suffix: 'dim',
+    formula: '1 - b3 - b5 - bb7',
+    intervals: [0, 3, 6, 9],
+    descriptionPt: 'Acorde simétrico formado por sobreposição de terças menores. Extremamente instável e excelente para transições de passagem.',
+    moodPt: 'Tenso, Mistério, Passagem, Dramático',
+    genrePt: 'Choro, Jazz, MPB, Música Clássica',
+  },
+  {
+    id: 'sus2',
+    namePt: 'Suspenso 2 (sus2)',
+    suffix: 'sus2',
+    formula: '1 - 2 - 5',
+    intervals: [0, 2, 7],
+    descriptionPt: 'Acorde aberto onde a 3ª é substituída pela 2ª Maior (9ª). Som cristalino, contemplativo e moderno.',
+    moodPt: 'Aberto, Contemplativo, Suave, Moderno',
+    genrePt: 'Rock Alternativo, Pop, Fingerstyle, Worship',
+  },
+  {
+    id: 'aug',
+    namePt: 'Aumentado (aug / +)',
+    suffix: 'aug',
+    formula: '1 - 3 - #5',
+    intervals: [0, 4, 8],
+    descriptionPt: 'Tríade com a 5ª elevada em meio tom. Sua simetria cria uma sonoridade flutuante e de surpresa harmônica.',
+    moodPt: 'Misterioso, Cinemático, Flutuante, Dramático',
+    genrePt: 'Jazz, MPB, Música Clássica, Trilhas Sonoras',
+  },
+  {
+    id: '6',
+    namePt: 'Maior com Sexta (6)',
+    suffix: '6',
+    formula: '1 - 3 - 5 - 6',
+    intervals: [0, 4, 7, 9],
+    descriptionPt: 'Acorde maior enriquecido pelo intervalo de 6ª Maior. Clássico em harmonias de samba, choro e jazz tradicional.',
+    moodPt: 'Balanço, Alegre, Clássico, Estável',
+    genrePt: 'Samba, Choro, Bossa Nova, Jazz Tradicional, Country',
+  },
+  {
+    id: 'm6',
+    namePt: 'Menor com Sexta (m6)',
+    suffix: 'm6',
+    formula: '1 - b3 - 5 - 6',
+    intervals: [0, 3, 7, 9],
+    descriptionPt: 'Acorde menor com a adição da 6ª Maior. Sonoridade marcante do modo Dórico, muito usada na música brasileira.',
+    moodPt: 'Sofisticado, Noturno, Dórico, Saudoso',
+    genrePt: 'Bossa Nova, Choro, MPB, Jazz, Tango',
+  },
+  {
+    id: '9',
+    namePt: 'Dominante Nona (9)',
+    suffix: '9',
+    formula: '1 - 3 - 5 - b7 - 9',
+    intervals: [0, 4, 7, 10, 14],
+    descriptionPt: 'Acorde dominante com a nona maior. Lendário no Funk (acorde James Brown), Soul e Blues urbano.',
+    moodPt: 'Groovado, Funky, Incisivo, Bluesy',
+    genrePt: 'Funk, Soul, Blues, Samba-Rock, Fusion',
+  },
+  {
+    id: 'maj9',
+    namePt: 'Sétima Maior com Nona (maj9 / 7M(9))',
+    suffix: 'maj9',
+    formula: '1 - 3 - 5 - 7 - 9',
+    intervals: [0, 4, 7, 11, 14],
+    descriptionPt: 'Um dos acordes mais aveludados e bonitos da harmonia moderna, combinando 7ª maior e 9ª maior.',
+    moodPt: 'Aveludado, Romântico, Lo-fi, Sofisticado',
+    genrePt: 'Neo-Soul, Lo-fi Hip Hop, Bossa Nova, Jazz Moderno',
+  },
+  {
+    id: 'm9',
+    namePt: 'Menor com Nona (m9)',
+    suffix: 'm9',
+    formula: '1 - b3 - 5 - b7 - 9',
+    intervals: [0, 3, 7, 10, 14],
+    descriptionPt: 'Acorde menor com 7ª e 9ª. Traz profundidade emocional e um clima noturno refinado.',
+    moodPt: 'Profundo, Noturno, Suave, Urbano',
+    genrePt: 'R&B, Jazz, Neo-Soul, Bossa Nova, Pop',
+  },
+  {
+    id: 'dim7',
+    namePt: 'Diminuto com 7ª Diminuta (dim7 / °7)',
+    suffix: 'dim7',
+    formula: '1 - b3 - b5 - bb7',
+    intervals: [0, 3, 6, 9],
+    descriptionPt: 'O acorde diminuto completo de 4 vozes simétricas (a intervalos de 1 tom e meio). Ideal para resoluções de meio tom.',
+    moodPt: 'Tenso, Mistério, Passagem, Clássico',
+    genrePt: 'Choro, Jazz, MPB, Música Clássica',
+  },
+];
+
+export interface CAGEDVoicingTemplate {
+  shapeId: 'C' | 'A' | 'G' | 'E' | 'D';
+  shapeNamePt: string;
+  rootStringIdx: number; // 0 = 6th string (E), 1 = 5th string (A), 2 = 4th string (D)
+  // offsets from root fret on string6 to string1 (-1 or null means muted)
+  offsets: (number | null)[];
+  fingers: (number | null)[];
+  intervals: (string | null)[];
+  barre: boolean;
+  tipPt: string;
+}
+
+// Map each chordType to its 5 CAGED templates
+export const CAGED_VOICING_TEMPLATES: Record<string, CAGEDVoicingTemplate[]> = {
+  maior: [
+    {
+      shapeId: 'E',
+      shapeNamePt: 'Formato E (Modelo Mi — Raiz na 6ª corda)',
+      rootStringIdx: 0,
+      offsets: [0, 2, 2, 1, 0, 0],
+      fingers: [1, 3, 4, 2, 1, 1],
+      intervals: ['1', '5', '1', '3', '5', '1'],
+      barre: true,
+      tipPt: 'A pestana mais conhecida do violão! O dedo 1 faz a barra na casa da Tônica na 6ª corda, enquanto os outros dedos formam o acorde de Mi.',
+    },
+    {
+      shapeId: 'A',
+      shapeNamePt: 'Formato A (Modelo Lá — Raiz na 5ª corda)',
+      rootStringIdx: 1,
+      offsets: [null, 0, 2, 2, 2, 0],
+      fingers: [null, 1, 2, 3, 4, 1],
+      intervals: [null, '1', '5', '1', '3', '5'],
+      barre: true,
+      tipPt: 'Tônica na 5ª corda. Você pode usar os dedos 2, 3 e 4 para as casas da frente, ou usar uma mini-pestana com o dedo 3 nas cordas D, G e B.',
+    },
+    {
+      shapeId: 'D',
+      shapeNamePt: 'Formato D (Modelo Ré — Raiz na 4ª corda)',
+      rootStringIdx: 2,
+      offsets: [null, null, 0, 2, 3, 2],
+      fingers: [null, null, 1, 2, 4, 3],
+      intervals: [null, null, '1', '5', '1', '3'],
+      barre: false,
+      tipPt: 'Ótimo para acompanhamento brilhante nas 4 cordas agudas. Tônica na 4ª corda.',
+    },
+    {
+      shapeId: 'C',
+      shapeNamePt: 'Formato C (Modelo Dó — Raiz na 5ª corda)',
+      rootStringIdx: 1,
+      offsets: [null, 0, -1, -3, -2, -3],
+      fingers: [null, 4, 3, 1, 2, 1],
+      intervals: [null, '1', '3', '5', '1', '3'],
+      barre: true,
+      tipPt: 'Formato amplo, excelente para arpejos e dedilhados. Requer elasticidade ou pestana com o dedo 1 nas cordas G e e.',
+    },
+    {
+      shapeId: 'G',
+      shapeNamePt: 'Formato G (Modelo Sol — Raiz na 6ª corda)',
+      rootStringIdx: 0,
+      offsets: [0, -1, -3, -3, -3, 0],
+      fingers: [3, 2, 1, 1, 1, 4],
+      intervals: ['1', '3', '5', '1', '3', '1'],
+      barre: true,
+      tipPt: 'O mais espaçado dos formatos CAGED. Em regiões graves, muitos violonistas tocam apenas as 4 cordas centrais ou superiores.',
+    },
+  ],
+  menor: [
+    {
+      shapeId: 'E',
+      shapeNamePt: 'Formato Em (Modelo Mi Menor — Raiz na 6ª corda)',
+      rootStringIdx: 0,
+      offsets: [0, 2, 2, 0, 0, 0],
+      fingers: [1, 3, 4, 1, 1, 1],
+      intervals: ['1', '5', '1', 'b3', '5', '1'],
+      barre: true,
+      tipPt: 'Levante o dedo 2 do formato maior para abaixar a 3ª em meio tom (b3). Som poderoso e encorpado.',
+    },
+    {
+      shapeId: 'A',
+      shapeNamePt: 'Formato Am (Modelo Lá Menor — Raiz na 5ª corda)',
+      rootStringIdx: 1,
+      offsets: [null, 0, 2, 2, 1, 0],
+      fingers: [null, 1, 3, 4, 2, 1],
+      intervals: [null, '1', '5', '1', 'b3', '5'],
+      barre: true,
+      tipPt: 'Formato clássico menor com Tônica na 5ª corda. Dedo 2 na corda B faz a terça menor.',
+    },
+    {
+      shapeId: 'D',
+      shapeNamePt: 'Formato Dm (Modelo Ré Menor — Raiz na 4ª corda)',
+      rootStringIdx: 2,
+      offsets: [null, null, 0, 2, 3, 1],
+      fingers: [null, null, 1, 2, 4, 1],
+      intervals: [null, null, '1', '5', '1', 'b3'],
+      barre: false,
+      tipPt: 'Acorde menor agudo de 4 cordas com excelente nitidez e separação de notas.',
+    },
+    {
+      shapeId: 'C',
+      shapeNamePt: 'Formato Cm (Modelo Dó Menor — Raiz na 5ª corda)',
+      rootStringIdx: 1,
+      offsets: [null, 0, -2, -3, -2, null],
+      fingers: [null, 4, 2, 1, 3, null],
+      intervals: [null, '1', 'b3', '5', '1', null],
+      barre: true,
+      tipPt: 'Voicing compacto de 4 cordas no formato C menor, ideal para levadas rítmicas limpas.',
+    },
+    {
+      shapeId: 'G',
+      shapeNamePt: 'Formato Gm (Modelo Sol Menor — Raiz na 6ª corda)',
+      rootStringIdx: 0,
+      offsets: [0, -2, -3, -3, -2, 0],
+      fingers: [4, 2, 1, 1, 3, 4],
+      intervals: ['1', 'b3', '5', '1', 'b3', '1'],
+      barre: true,
+      tipPt: 'Adaptação do formato G com a 3ª menor nas cordas A e B.',
+    },
+  ],
+  dom7: [
+    {
+      shapeId: 'E',
+      shapeNamePt: 'Formato E7 (Modelo Mi Dominante — Raiz na 6ª corda)',
+      rootStringIdx: 0,
+      offsets: [0, 2, 0, 1, 0, 0],
+      fingers: [1, 3, 1, 2, 1, 1],
+      intervals: ['1', '5', 'b7', '3', '5', '1'],
+      barre: true,
+      tipPt: 'Ao soltar o dedo mindinho (corda D), revelamos a sétima menor (b7). O som clássico do Blues e do Rock.',
+    },
+    {
+      shapeId: 'A',
+      shapeNamePt: 'Formato A7 (Modelo Lá Dominante — Raiz na 5ª corda)',
+      rootStringIdx: 1,
+      offsets: [null, 0, 2, 0, 2, 0],
+      fingers: [null, 1, 2, 1, 3, 1],
+      intervals: [null, '1', '5', 'b7', '3', '5'],
+      barre: true,
+      tipPt: 'A sétima menor está na corda G aberta dentro do formato A. Fácil de tocar e super ressonante.',
+    },
+    {
+      shapeId: 'D',
+      shapeNamePt: 'Formato D7 (Modelo Ré Dominante — Raiz na 4ª corda)',
+      rootStringIdx: 2,
+      offsets: [null, null, 0, 2, 1, 2],
+      fingers: [null, null, 1, 3, 2, 4],
+      intervals: [null, null, '1', '5', 'b7', '3'],
+      barre: false,
+      tipPt: 'Triângulo na região aguda. Ótimo para solos e grooves country/blues.',
+    },
+    {
+      shapeId: 'C',
+      shapeNamePt: 'Formato C7 (Modelo Dó Dominante — Raiz na 5ª corda)',
+      rootStringIdx: 1,
+      offsets: [null, 0, -1, -3, -2, -1],
+      fingers: [null, 3, 2, 1, 1, 4],
+      intervals: [null, '1', '3', '5', '1', 'b7'],
+      barre: false,
+      tipPt: 'O famoso acorde com 7ª que todo violonista aprende no tom de Dó, transportado pelo braço.',
+    },
+    {
+      shapeId: 'G',
+      shapeNamePt: 'Formato G7 (Modelo Sol Dominante — Raiz na 6ª corda)',
+      rootStringIdx: 0,
+      offsets: [0, -1, -3, -3, -3, -2],
+      fingers: [3, 2, 1, 1, 1, 1],
+      intervals: ['1', '3', '5', '1', '3', 'b7'],
+      barre: true,
+      tipPt: 'A sétima menor está na 1ª corda agudíssima, dando um fecho brilhante à batida.',
+    },
+  ],
+  maj7: [
+    {
+      shapeId: 'E',
+      shapeNamePt: 'Formato Emaj7 (Modelo Mi 7M — Raiz na 6ª corda)',
+      rootStringIdx: 0,
+      offsets: [0, null, 1, 1, 0, null],
+      fingers: [1, null, 3, 4, 2, null],
+      intervals: ['1', null, '7', '3', '5', null],
+      barre: false,
+      tipPt: 'Voicing favorito da Bossa Nova e do Jazz! Sem a 5ª corda, evitamos excesso de graves e o acorde soa límpido.',
+    },
+    {
+      shapeId: 'A',
+      shapeNamePt: 'Formato Amaj7 (Modelo Lá 7M — Raiz na 5ª corda)',
+      rootStringIdx: 1,
+      offsets: [null, 0, 2, 1, 2, 0],
+      fingers: [null, 1, 3, 2, 4, 1],
+      intervals: [null, '1', '5', '7', '3', '5'],
+      barre: true,
+      tipPt: 'Um formato super elegante em escadinha nas cordas centrais. Tônica na 5ª corda.',
+    },
+    {
+      shapeId: 'D',
+      shapeNamePt: 'Formato Dmaj7 (Modelo Ré 7M — Raiz na 4ª corda)',
+      rootStringIdx: 2,
+      offsets: [null, null, 0, 2, 2, 2],
+      fingers: [null, null, 1, 2, 3, 4],
+      intervals: [null, null, '1', '5', '7', '3'],
+      barre: true,
+      tipPt: 'Você pode pressionar as cordas G, B e e com uma pestana do dedo 1 na mesma casa da 7ª maior!',
+    },
+    {
+      shapeId: 'C',
+      shapeNamePt: 'Formato Cmaj7 (Modelo Dó 7M — Raiz na 5ª corda)',
+      rootStringIdx: 1,
+      offsets: [null, 0, -1, -3, -3, -3],
+      fingers: [null, 4, 3, 1, 1, 1],
+      intervals: [null, '1', '3', '5', '7', '3'],
+      barre: true,
+      tipPt: 'Formato suave e espacial com a 7ª maior na corda B.',
+    },
+    {
+      shapeId: 'G',
+      shapeNamePt: 'Formato Gmaj7 (Modelo Sol 7M — Raiz na 6ª corda)',
+      rootStringIdx: 0,
+      offsets: [0, null, -3, -3, -3, -1],
+      fingers: [3, null, 1, 1, 1, 2],
+      intervals: ['1', null, '5', '1', '3', '7'],
+      barre: true,
+      tipPt: 'A sétima maior na corda agudíssima cria um contraponto com o baixo profundo da 6ª corda.',
+    },
+  ],
+  m7: [
+    {
+      shapeId: 'E',
+      shapeNamePt: 'Formato Em7 (Modelo Mi m7 — Raiz na 6ª corda)',
+      rootStringIdx: 0,
+      offsets: [0, null, 0, 0, 0, null],
+      fingers: [1, null, 1, 1, 1, null],
+      intervals: ['1', null, 'b7', 'b3', '5', null],
+      barre: true,
+      tipPt: 'Pestana simples com o dedo 1 cobrindo da 6ª até a 2ª corda. O som perfeito para Neo-Soul e R&B.',
+    },
+    {
+      shapeId: 'A',
+      shapeNamePt: 'Formato Am7 (Modelo Lá m7 — Raiz na 5ª corda)',
+      rootStringIdx: 1,
+      offsets: [null, 0, 2, 0, 1, 0],
+      fingers: [null, 1, 3, 1, 2, 1],
+      intervals: [null, '1', '5', 'b7', 'b3', '5'],
+      barre: true,
+      tipPt: 'O acorde menor com sétima mais tocado no violão. Confortável e de sonoridade equilibrada.',
+    },
+    {
+      shapeId: 'D',
+      shapeNamePt: 'Formato Dm7 (Modelo Ré m7 — Raiz na 4ª corda)',
+      rootStringIdx: 2,
+      offsets: [null, null, 0, 2, 1, 1],
+      fingers: [null, null, 1, 3, 2, 2],
+      intervals: [null, null, '1', '5', 'b7', 'b3'],
+      barre: false,
+      tipPt: 'Pestana curta com o dedo 1 ou 2 nas cordas B e e. Timbre leve e cortante.',
+    },
+    {
+      shapeId: 'C',
+      shapeNamePt: 'Formato Cm7 (Modelo Dó m7 — Raiz na 5ª corda)',
+      rootStringIdx: 1,
+      offsets: [null, 0, -2, -3, -2, -1],
+      fingers: [null, 3, 1, 1, 1, 2],
+      intervals: [null, '1', 'b3', '5', '1', 'b7'],
+      barre: true,
+      tipPt: 'Voicing muito apreciado por guitarristas de jazz por sua clareza nas vozes médias.',
+    },
+    {
+      shapeId: 'G',
+      shapeNamePt: 'Formato Gm7 (Modelo Sol m7 — Raiz na 6ª corda)',
+      rootStringIdx: 0,
+      offsets: [0, -2, -3, -3, -2, -2],
+      fingers: [4, 2, 1, 1, 3, 3],
+      intervals: ['1', 'b3', '5', '1', 'b3', 'b7'],
+      barre: true,
+      tipPt: 'Versão com a 7ª menor e 3ª menor na parte aguda do formato G.',
+    },
+  ],
+  sus4: [
+    {
+      shapeId: 'E',
+      shapeNamePt: 'Formato Esus4 (Modelo Mi sus4 — Raiz na 6ª corda)',
+      rootStringIdx: 0,
+      offsets: [0, 2, 2, 2, 0, 0],
+      fingers: [1, 2, 3, 4, 1, 1],
+      intervals: ['1', '5', '1', '4', '5', '1'],
+      barre: true,
+      tipPt: 'O dedo mindinho sobe a 3ª maior em meio tom para a 4ª justa (4). Gera uma expectativa imediata de repouso.',
+    },
+    {
+      shapeId: 'A',
+      shapeNamePt: 'Formato Asus4 (Modelo Lá sus4 — Raiz na 5ª corda)',
+      rootStringIdx: 1,
+      offsets: [null, 0, 2, 2, 3, 0],
+      fingers: [null, 1, 2, 3, 4, 1],
+      intervals: [null, '1', '5', '1', '4', '5'],
+      barre: true,
+      tipPt: 'Acorde expansivo muito usado no Rock britânico e em canções pop acústicas.',
+    },
+    {
+      shapeId: 'D',
+      shapeNamePt: 'Formato Dsus4 (Modelo Ré sus4 — Raiz na 4ª corda)',
+      rootStringIdx: 2,
+      offsets: [null, null, 0, 2, 3, 3],
+      fingers: [null, null, 1, 2, 3, 4],
+      intervals: [null, null, '1', '5', '1', '4'],
+      barre: false,
+      tipPt: 'A nota na 1ª corda sobe uma casa, trazendo brilho e suspensão agudos.',
+    },
+    {
+      shapeId: 'C',
+      shapeNamePt: 'Formato Csus4 (Modelo Dó sus4 — Raiz na 5ª corda)',
+      rootStringIdx: 1,
+      offsets: [null, 0, 0, -3, -2, -3],
+      fingers: [null, 4, 4, 1, 2, 1],
+      intervals: [null, '1', '4', '5', '1', '4'],
+      barre: true,
+      tipPt: 'Substitui a terça aberta por um intervalo de 4ª, soando amplo e sinfônico.',
+    },
+    {
+      shapeId: 'G',
+      shapeNamePt: 'Formato Gsus4 (Modelo Sol sus4 — Raiz na 6ª corda)',
+      rootStringIdx: 0,
+      offsets: [0, 0, -3, -3, -2, 0],
+      fingers: [3, 4, 1, 1, 2, 3],
+      intervals: ['1', '4', '5', '1', '4', '1'],
+      barre: true,
+      tipPt: 'A 4ª justa está na 5ª corda. Som folclórico e de grande impacto acústico.',
+    },
+  ],
+  add9: [
+    {
+      shapeId: 'E',
+      shapeNamePt: 'Formato Eadd9 (Modelo Mi add9 — Raiz na 6ª corda)',
+      rootStringIdx: 0,
+      offsets: [0, 2, 4, 1, 0, 0],
+      fingers: [1, 2, 4, 1, 1, 1],
+      intervals: ['1', '5', '9', '3', '5', '1'],
+      barre: true,
+      tipPt: 'Abertura linda para violão fingerstyle: o dedo 4 alcança a 9ª na 4ª corda.',
+    },
+    {
+      shapeId: 'A',
+      shapeNamePt: 'Formato Aadd9 (Modelo Lá add9 — Raiz na 5ª corda)',
+      rootStringIdx: 1,
+      offsets: [null, 0, 2, 4, 2, 0],
+      fingers: [null, 1, 2, 4, 3, 1],
+      intervals: [null, '1', '5', '9', '3', '5'],
+      barre: true,
+      tipPt: 'A 9ª está na corda G. Dá um colorido sofisticado e moderno a qualquer progressão pop/MPB.',
+    },
+    {
+      shapeId: 'D',
+      shapeNamePt: 'Formato Dadd9 (Modelo Ré add9 — Raiz na 4ª corda)',
+      rootStringIdx: 2,
+      offsets: [null, null, 0, 2, 3, 0],
+      fingers: [null, null, 1, 2, 3, 1],
+      intervals: [null, null, '1', '5', '1', '9'],
+      barre: false,
+      tipPt: 'A primeira corda solta (ou com pestana) faz a nona maior brilhar nas alturas.',
+    },
+    {
+      shapeId: 'C',
+      shapeNamePt: 'Formato Cadd9 (Modelo Dó add9 — Raiz na 5ª corda)',
+      rootStringIdx: 1,
+      offsets: [null, 0, -1, 0, -2, -3],
+      fingers: [null, 3, 2, 4, 1, 1],
+      intervals: [null, '1', '3', '9', '1', '3'],
+      barre: false,
+      tipPt: 'Um dos acordes preferidos do violão acústico e do folk rock contemporâneo.',
+    },
+    {
+      shapeId: 'G',
+      shapeNamePt: 'Formato Gadd9 (Modelo Sol add9 — Raiz na 6ª corda)',
+      rootStringIdx: 0,
+      offsets: [0, -1, -3, -1, -3, 0],
+      fingers: [3, 2, 1, 4, 1, 3],
+      intervals: ['1', '3', '5', '9', '3', '1'],
+      barre: true,
+      tipPt: 'A nona é adicionada na corda G, enriquecendo o tradicional acorde de Sol.',
+    },
+  ],
+  m7b5: [
+    {
+      shapeId: 'E',
+      shapeNamePt: 'Formato Em7(b5) (Modelo Mi Meio Diminuto — Raiz na 6ª corda)',
+      rootStringIdx: 0,
+      offsets: [0, null, 0, 0, -1, null],
+      fingers: [2, null, 3, 4, 1, null],
+      intervals: ['1', null, 'b7', 'b3', 'b5', null],
+      barre: false,
+      tipPt: 'O famoso acorde "m7(b5)" da Bossa Nova! Toca-se sem as cordas A e e para nitidez absoluta.',
+    },
+    {
+      shapeId: 'A',
+      shapeNamePt: 'Formato Am7(b5) (Modelo Lá Meio Diminuto — Raiz na 5ª corda)',
+      rootStringIdx: 1,
+      offsets: [null, 0, 1, 0, 1, null],
+      fingers: [null, 1, 2, 3, 4, null],
+      intervals: [null, '1', 'b5', 'b7', 'b3', null],
+      barre: false,
+      tipPt: 'Acorde compacto nas 4 cordas centrais. Super fácil de alternar com acordes dominantes no II-V-I menor.',
+    },
+    {
+      shapeId: 'D',
+      shapeNamePt: 'Formato Dm7(b5) (Modelo Ré Meio Diminuto — Raiz na 4ª corda)',
+      rootStringIdx: 2,
+      offsets: [null, null, 0, 1, 1, 1],
+      fingers: [null, null, 1, 2, 3, 4],
+      intervals: [null, null, '1', 'b5', 'b7', 'b3'],
+      barre: true,
+      tipPt: 'Pestana na 1ª, 2ª e 3ª cordas com a tônica na 4ª corda.',
+    },
+    {
+      shapeId: 'C',
+      shapeNamePt: 'Formato Cm7(b5) (Modelo Dó Meio Diminuto — Raiz na 5ª corda)',
+      rootStringIdx: 1,
+      offsets: [null, 0, -2, -2, -2, -1],
+      fingers: [null, 3, 1, 1, 1, 2],
+      intervals: [null, '1', 'b3', 'b5', 'b7', 'b3'],
+      barre: true,
+      tipPt: 'Adaptação do formato de C com a quinta diminuta e sétima menor.',
+    },
+    {
+      shapeId: 'G',
+      shapeNamePt: 'Formato Gm7(b5) (Modelo Sol Meio Diminuto — Raiz na 6ª corda)',
+      rootStringIdx: 0,
+      offsets: [0, null, -1, -3, -2, -2],
+      fingers: [3, null, 4, 1, 2, 2],
+      intervals: ['1', null, 'b5', '1', 'b3', 'b7'],
+      barre: true,
+      tipPt: 'Uma variação mais grave de meio diminuto com a quinta b5 na corda D.',
+    },
+  ],
+  dim: [
+    {
+      shapeId: 'E',
+      shapeNamePt: 'Formato Edim7 (Modelo Mi Diminuto — Raiz na 6ª corda)',
+      rootStringIdx: 0,
+      offsets: [0, null, -1, 0, -1, null],
+      fingers: [2, null, 1, 3, 1, null],
+      intervals: ['1', null, 'b5', 'bb7', 'b3', null],
+      barre: false,
+      tipPt: 'Acorde diminuto simétrico. Como as notas se repetem a cada 3 casas (tom e meio), você pode deslizar este formato pelo braço de 3 em 3 casas!',
+    },
+    {
+      shapeId: 'A',
+      shapeNamePt: 'Formato Adim7 (Modelo Lá Diminuto — Raiz na 5ª corda)',
+      rootStringIdx: 1,
+      offsets: [null, 0, 1, -1, 1, null],
+      fingers: [null, 2, 3, 1, 4, null],
+      intervals: [null, '1', 'b5', 'bb7', 'b3', null],
+      barre: false,
+      tipPt: 'Outro formato simétrico super versátil. Muito usado no Choro e Samba-Canção para ligar acordes vizinhos.',
+    },
+    {
+      shapeId: 'D',
+      shapeNamePt: 'Formato Ddim7 (Modelo Ré Diminuto — Raiz na 4ª corda)',
+      rootStringIdx: 2,
+      offsets: [null, null, 0, 1, 0, 1],
+      fingers: [null, null, 1, 3, 2, 4],
+      intervals: [null, null, '1', 'b5', 'bb7', 'b3'],
+      barre: false,
+      tipPt: 'O clássico "losango" de 4 cordas na região aguda do violão.',
+    },
+    {
+      shapeId: 'C',
+      shapeNamePt: 'Formato Cdim7 (Modelo Dó Diminuto — Raiz na 5ª corda)',
+      rootStringIdx: 1,
+      offsets: [null, 0, -1, -2, -1, -2],
+      fingers: [null, 4, 3, 1, 2, 1],
+      intervals: [null, '1', 'b3', 'b5', 'bb7', 'b3'],
+      barre: false,
+      tipPt: 'Derivado do formato C com todas as notas abaixadas na simetria diminuta.',
+    },
+    {
+      shapeId: 'G',
+      shapeNamePt: 'Formato Gdim7 (Modelo Sol Diminuto — Raiz na 6ª corda)',
+      rootStringIdx: 0,
+      offsets: [0, null, -1, -3, -2, -4],
+      fingers: [4, null, 3, 2, 2, 1],
+      intervals: ['1', null, 'b5', '1', 'b3', 'bb7'],
+      barre: false,
+      tipPt: 'Ampla abertura diminuta interligando a região grave e média.',
+    },
+  ],
+  sus2: [
+    {
+      shapeId: 'E',
+      shapeNamePt: 'Formato E (Modelo Mi sus2 — Raiz na 6ª corda)',
+      rootStringIdx: 0,
+      offsets: [0, 2, 4, 4, 0, 0],
+      fingers: [1, 2, 4, 4, 1, 1],
+      intervals: ['1', '5', '9', '5', '5', '1'],
+      barre: true,
+      tipPt: 'A 3ª é substituída pela 2ª maior/9ª. Sonoridade aberta e ressonante.',
+    },
+    {
+      shapeId: 'A',
+      shapeNamePt: 'Formato A (Modelo Lá sus2 — Raiz na 5ª corda)',
+      rootStringIdx: 1,
+      offsets: [null, 0, 2, 2, 0, 0],
+      fingers: [null, 1, 2, 3, 1, 1],
+      intervals: [null, '1', '5', '1', '2', '5'],
+      barre: true,
+      tipPt: 'Extremamente popular em violão de acompanhamento folk e pop.',
+    },
+    {
+      shapeId: 'D',
+      shapeNamePt: 'Formato D (Modelo Ré sus2 — Raiz na 4ª corda)',
+      rootStringIdx: 2,
+      offsets: [null, null, 0, 2, 3, 0],
+      fingers: [null, null, 1, 2, 3, 1],
+      intervals: [null, null, '1', '5', '1', '2'],
+      barre: false,
+      tipPt: 'Deixe a corda 1 aberta ou toque o formato com os dedos 1 e 2.',
+    },
+    {
+      shapeId: 'C',
+      shapeNamePt: 'Formato C (Modelo Dó sus2 — Raiz na 5ª corda)',
+      rootStringIdx: 1,
+      offsets: [null, 0, 0, -2, -2, -2],
+      fingers: [null, 3, 2, 1, 1, 1],
+      intervals: [null, '1', '2', '5', '1', '5'],
+      barre: true,
+      tipPt: 'Excelente para transições para acordes maiores no estilo fingerstyle.',
+    },
+    {
+      shapeId: 'G',
+      shapeNamePt: 'Formato G (Modelo Sol sus2 — Raiz na 6ª corda)',
+      rootStringIdx: 0,
+      offsets: [0, 0, 0, -2, -2, 0],
+      fingers: [2, 1, 1, 1, 1, 3],
+      intervals: ['1', '2', '5', '1', '2', '1'],
+      barre: false,
+      tipPt: 'Sonoridade ampla usando cordas soltas ou pestana parcial.',
+    },
+  ],
+  aug: [
+    {
+      shapeId: 'E',
+      shapeNamePt: 'Formato E (Modelo Mi Aumentado — Raiz na 6ª corda)',
+      rootStringIdx: 0,
+      offsets: [0, null, 2, 1, 1, 0],
+      fingers: [1, null, 3, 2, 2, 1],
+      intervals: ['1', null, '1', '3', '#5', '1'],
+      barre: true,
+      tipPt: 'A 5ª aumentada cria um efeito de surpresa que pede resolução para a tônica.',
+    },
+    {
+      shapeId: 'A',
+      shapeNamePt: 'Formato A (Modelo Lá Aumentado — Raiz na 5ª corda)',
+      rootStringIdx: 1,
+      offsets: [null, 0, 3, 2, 2, 1],
+      fingers: [null, 1, 4, 2, 3, 1],
+      intervals: [null, '1', '#5', '1', '3', '#5'],
+      barre: false,
+      tipPt: 'Por ser simétrico, o desenho se repete a cada 4 casas no braço.',
+    },
+    {
+      shapeId: 'D',
+      shapeNamePt: 'Formato D (Modelo Ré Aumentado — Raiz na 4ª corda)',
+      rootStringIdx: 2,
+      offsets: [null, null, 0, 3, 3, 2],
+      fingers: [null, null, 1, 3, 4, 2],
+      intervals: [null, null, '1', '#5', '1', '3'],
+      barre: false,
+      tipPt: 'Desenho compacto excelente para arranjos de Jazz e MPB.',
+    },
+    {
+      shapeId: 'C',
+      shapeNamePt: 'Formato C (Modelo Dó Aumentado — Raiz na 5ª corda)',
+      rootStringIdx: 1,
+      offsets: [null, 0, -1, -3, -1, null],
+      fingers: [null, 3, 2, 1, 4, null],
+      intervals: [null, '1', '3', '#5', '1', null],
+      barre: false,
+      tipPt: 'Abertura confortável com baixo bem definido na 5ª corda.',
+    },
+    {
+      shapeId: 'G',
+      shapeNamePt: 'Formato G (Modelo Sol Aumentado — Raiz na 6ª corda)',
+      rootStringIdx: 0,
+      offsets: [0, -2, -3, -4, null, null],
+      fingers: [4, 2, 3, 1, null, null],
+      intervals: ['1', '3', '#5', '1', null, null],
+      barre: false,
+      tipPt: 'Abertura focada nos graves e médios, ideal como passagem.',
+    },
+  ],
+  '6': [
+    {
+      shapeId: 'E',
+      shapeNamePt: 'Formato E (Modelo Mi6 — Raiz na 6ª corda)',
+      rootStringIdx: 0,
+      offsets: [0, null, 2, 1, 2, 0],
+      fingers: [1, null, 2, 1, 3, 1],
+      intervals: ['1', null, '1', '3', '6', '1'],
+      barre: true,
+      tipPt: 'Acorde alegre e clássico do samba e bossa nova.',
+    },
+    {
+      shapeId: 'A',
+      shapeNamePt: 'Formato A (Modelo Lá6 — Raiz na 5ª corda)',
+      rootStringIdx: 1,
+      offsets: [null, 0, 2, 2, 2, 2],
+      fingers: [null, 1, 2, 3, 4, 4],
+      intervals: [null, '1', '5', '1', '3', '6'],
+      barre: true,
+      tipPt: 'Você pode tocar com pestana nos dedos ou com os 4 dedos alinhados.',
+    },
+    {
+      shapeId: 'D',
+      shapeNamePt: 'Formato D (Modelo Ré6 — Raiz na 4ª corda)',
+      rootStringIdx: 2,
+      offsets: [null, null, 0, 2, 0, 2],
+      fingers: [null, null, 1, 3, 1, 4],
+      intervals: [null, null, '1', '5', '6', '3'],
+      barre: false,
+      tipPt: 'Desenho brilhante, muito usado no Jazz tradicional e Western Swing.',
+    },
+    {
+      shapeId: 'C',
+      shapeNamePt: 'Formato C (Modelo Dó6 — Raiz na 5ª corda)',
+      rootStringIdx: 1,
+      offsets: [null, 0, -2, -2, -2, -3],
+      fingers: [null, 4, 2, 2, 2, 1],
+      intervals: [null, '1', '3', '6', '1', '3'],
+      barre: true,
+      tipPt: 'Sonoridade rica com a sexta no meio do acorde.',
+    },
+    {
+      shapeId: 'G',
+      shapeNamePt: 'Formato G (Modelo Sol6 — Raiz na 6ª corda)',
+      rootStringIdx: 0,
+      offsets: [0, null, 0, 0, 0, 0],
+      fingers: [2, null, 1, 1, 1, 1],
+      intervals: ['1', null, '3', '6', '1', '3'],
+      barre: false,
+      tipPt: 'Acorde natural com excelente ressonância e balanço.',
+    },
+  ],
+  m6: [
+    {
+      shapeId: 'E',
+      shapeNamePt: 'Formato E (Modelo Mim6 — Raiz na 6ª corda)',
+      rootStringIdx: 0,
+      offsets: [0, null, 2, 0, 2, 0],
+      fingers: [1, null, 2, 1, 3, 1],
+      intervals: ['1', null, '1', 'b3', '6', '1'],
+      barre: true,
+      tipPt: 'Sonoridade misteriosa do modo Dórico, ícone do Choro e Tango.',
+    },
+    {
+      shapeId: 'A',
+      shapeNamePt: 'Formato A (Modelo Lám6 — Raiz na 5ª corda)',
+      rootStringIdx: 1,
+      offsets: [null, 0, 2, 2, 1, 2],
+      fingers: [null, 1, 2, 3, 1, 4],
+      intervals: [null, '1', '5', '1', 'b3', '6'],
+      barre: true,
+      tipPt: 'Um dos acordes mais bonitos e expressivos da MPB e Bossa Nova.',
+    },
+    {
+      shapeId: 'D',
+      shapeNamePt: 'Formato D (Modelo Rém6 — Raiz na 4ª corda)',
+      rootStringIdx: 2,
+      offsets: [null, null, 0, 2, 0, 1],
+      fingers: [null, null, 1, 3, 1, 2],
+      intervals: [null, null, '1', '5', '6', 'b3'],
+      barre: false,
+      tipPt: 'Fácil execução e excelente para conduções rítmicas ágeis.',
+    },
+    {
+      shapeId: 'C',
+      shapeNamePt: 'Formato C (Modelo Dóm6 — Raiz na 5ª corda)',
+      rootStringIdx: 1,
+      offsets: [null, 0, -2, -3, -2, -3],
+      fingers: [null, 4, 2, 1, 3, 1],
+      intervals: [null, '1', 'b3', '6', '1', 'b3'],
+      barre: true,
+      tipPt: 'Posição estendida com som profundo.',
+    },
+    {
+      shapeId: 'G',
+      shapeNamePt: 'Formato G (Modelo Solm6 — Raiz na 6ª corda)',
+      rootStringIdx: 0,
+      offsets: [0, null, -2, 0, -2, 0],
+      fingers: [2, null, 1, 1, 1, 3],
+      intervals: ['1', null, 'b3', '6', '1', 'b3'],
+      barre: false,
+      tipPt: 'Desenho aberto excelente para acordes cadenciados.',
+    },
+  ],
+  '9': [
+    {
+      shapeId: 'E',
+      shapeNamePt: 'Formato E (Modelo Mi9 — Raiz na 6ª corda)',
+      rootStringIdx: 0,
+      offsets: [0, null, 0, 1, 0, 2],
+      fingers: [1, null, 1, 2, 1, 4],
+      intervals: ['1', null, 'b7', '3', '5', '9'],
+      barre: true,
+      tipPt: 'Acorde com pegada forte de Blues, Funk e Soul.',
+    },
+    {
+      shapeId: 'A',
+      shapeNamePt: 'Formato A (Modelo Lá9 - O Acorde de James Brown — Raiz na 5ª corda)',
+      rootStringIdx: 1,
+      offsets: [null, 0, -1, 0, 0, 0],
+      fingers: [null, 2, 1, 3, 3, 3],
+      intervals: [null, '1', '3', 'b7', '9', '5'],
+      barre: true,
+      tipPt: 'O acorde mais importante do Funk e Soul! O dedo 3 faz mini-pestana nas 3 cordas agudas.',
+    },
+    {
+      shapeId: 'D',
+      shapeNamePt: 'Formato D (Modelo Ré9 — Raiz na 4ª corda)',
+      rootStringIdx: 2,
+      offsets: [null, null, 0, 2, 1, 0],
+      fingers: [null, null, 1, 3, 2, 1],
+      intervals: [null, null, '1', '5', 'b7', '9'],
+      barre: false,
+      tipPt: 'Sonoridade rica e brilhante sem precisar de pestana.',
+    },
+    {
+      shapeId: 'C',
+      shapeNamePt: 'Formato C (Modelo Dó9 — Raiz na 5ª corda)',
+      rootStringIdx: 1,
+      offsets: [null, 0, -2, 0, -2, null],
+      fingers: [null, 3, 1, 4, 2, null],
+      intervals: [null, '1', '3', 'b7', '9', null],
+      barre: false,
+      tipPt: 'Abertura clássica do Jazz moderno e MPB.',
+    },
+    {
+      shapeId: 'G',
+      shapeNamePt: 'Formato G (Modelo Sol9 — Raiz na 6ª corda)',
+      rootStringIdx: 0,
+      offsets: [0, null, 0, 2, 0, null],
+      fingers: [1, null, 1, 3, 2, null],
+      intervals: ['1', null, 'b7', '9', '3', null],
+      barre: true,
+      tipPt: 'Fácil de tocar, excelente para conduções de Blues.',
+    },
+  ],
+  maj9: [
+    {
+      shapeId: 'E',
+      shapeNamePt: 'Formato E (Modelo Mi 7M(9) — Raiz na 6ª corda)',
+      rootStringIdx: 0,
+      offsets: [0, null, 1, 1, 0, null],
+      fingers: [1, null, 2, 3, 1, null],
+      intervals: ['1', null, '7', '3', '5', null],
+      barre: false,
+      tipPt: 'Acorde aveludado lendário da Bossa Nova, Neo-Soul e Lo-fi.',
+    },
+    {
+      shapeId: 'A',
+      shapeNamePt: 'Formato A (Modelo Lá 7M(9) — Raiz na 5ª corda)',
+      rootStringIdx: 1,
+      offsets: [null, 0, -1, 1, 0, null],
+      fingers: [null, 2, 1, 4, 3, null],
+      intervals: [null, '1', '3', '7', '9', null],
+      barre: false,
+      tipPt: 'O acorde mais elegante do violão brasileiro. Perfeito para introduções suaves.',
+    },
+    {
+      shapeId: 'D',
+      shapeNamePt: 'Formato D (Modelo Ré 7M(9) — Raiz na 4ª corda)',
+      rootStringIdx: 2,
+      offsets: [null, null, 0, 2, 2, 0],
+      fingers: [null, null, 1, 2, 3, 1],
+      intervals: [null, null, '1', '5', '7', '9'],
+      barre: false,
+      tipPt: 'Sonoridade celestial no registro agudo.',
+    },
+    {
+      shapeId: 'C',
+      shapeNamePt: 'Formato C (Modelo Dó 7M(9) — Raiz na 5ª corda)',
+      rootStringIdx: 1,
+      offsets: [null, 0, 0, 0, 0, null],
+      fingers: [null, 1, 1, 1, 1, null],
+      intervals: [null, '1', '5', '7', '3', null],
+      barre: true,
+      tipPt: 'Pestana simples nas 4 cordas internas.',
+    },
+    {
+      shapeId: 'G',
+      shapeNamePt: 'Formato G (Modelo Sol 7M(9) — Raiz na 6ª corda)',
+      rootStringIdx: 0,
+      offsets: [0, null, 0, 2, 0, 2],
+      fingers: [1, null, 1, 3, 2, 4],
+      intervals: ['1', null, '7', '9', '3', '5'],
+      barre: true,
+      tipPt: 'Acorde expansivo com som sinfônico.',
+    },
+  ],
+  m9: [
+    {
+      shapeId: 'E',
+      shapeNamePt: 'Formato E (Modelo Mim9 — Raiz na 6ª corda)',
+      rootStringIdx: 0,
+      offsets: [0, null, 0, 0, 0, 2],
+      fingers: [1, null, 1, 1, 1, 4],
+      intervals: ['1', null, 'b7', 'b3', '5', '9'],
+      barre: true,
+      tipPt: 'O acorde noturno e moderno por excelência no Jazz e R&B.',
+    },
+    {
+      shapeId: 'A',
+      shapeNamePt: 'Formato A (Modelo Lám9 — Raiz na 5ª corda)',
+      rootStringIdx: 1,
+      offsets: [null, 0, -1, 0, 0, null],
+      fingers: [null, 2, 1, 3, 4, null],
+      intervals: [null, '1', 'b3', 'b7', '9', null],
+      barre: false,
+      tipPt: 'Harmonia aveludada sem pestana, ícone do Neo-Soul.',
+    },
+    {
+      shapeId: 'D',
+      shapeNamePt: 'Formato D (Modelo Rém9 — Raiz na 4ª corda)',
+      rootStringIdx: 2,
+      offsets: [null, null, 0, 2, 1, 0],
+      fingers: [null, null, 1, 3, 2, 1],
+      intervals: [null, null, '1', '5', 'b7', '9'],
+      barre: false,
+      tipPt: 'Confortável e expressivo nas cordas agudas.',
+    },
+    {
+      shapeId: 'C',
+      shapeNamePt: 'Formato C (Modelo Dóm9 — Raiz na 5ª corda)',
+      rootStringIdx: 1,
+      offsets: [null, 0, -2, -3, -1, null],
+      fingers: [null, 3, 2, 1, 4, null],
+      intervals: [null, '1', 'b3', 'b7', '9', null],
+      barre: false,
+      tipPt: 'Abertura clássica no estilo Bill Evans adaptada ao violão.',
+    },
+    {
+      shapeId: 'G',
+      shapeNamePt: 'Formato G (Modelo Solm9 — Raiz na 6ª corda)',
+      rootStringIdx: 0,
+      offsets: [0, null, -2, 0, -1, null],
+      fingers: [2, null, 1, 3, 4, null],
+      intervals: ['1', null, 'b3', 'b7', '9', null],
+      barre: false,
+      tipPt: 'Som denso e emotivo na região média do braço.',
+    },
+  ],
+  dim7: [
+    {
+      shapeId: 'E',
+      shapeNamePt: 'Formato Edim7 (Modelo Mi Diminuto — Raiz na 6ª corda)',
+      rootStringIdx: 0,
+      offsets: [0, null, -1, 0, -1, null],
+      fingers: [2, null, 1, 3, 1, null],
+      intervals: ['1', null, 'bb7', 'b3', 'b5', null],
+      barre: true,
+      tipPt: 'Pode ser movido de 3 em 3 casas produzindo a mesma harmonia invertida!',
+    },
+    {
+      shapeId: 'A',
+      shapeNamePt: 'Formato Adim7 (Modelo Lá Diminuto — Raiz na 5ª corda)',
+      rootStringIdx: 1,
+      offsets: [null, 0, 1, -1, 1, null],
+      fingers: [null, 1, 3, 2, 4, null],
+      intervals: [null, '1', 'b5', 'bb7', 'b3', null],
+      barre: false,
+      tipPt: 'Formato clássico do Choro e Samba, muito ergonômico.',
+    },
+    {
+      shapeId: 'D',
+      shapeNamePt: 'Formato Ddim7 (Modelo Ré Diminuto — Raiz na 4ª corda)',
+      rootStringIdx: 2,
+      offsets: [null, null, 0, 1, -1, 1],
+      fingers: [null, null, 1, 3, 2, 4],
+      intervals: [null, null, '1', 'b5', 'bb7', 'b3'],
+      barre: false,
+      tipPt: 'O desenho simétrico nas 4 cordas agudas mais famoso da guitarra.',
+    },
+    {
+      shapeId: 'C',
+      shapeNamePt: 'Formato Cdim7 (Modelo Dó Diminuto — Raiz na 5ª corda)',
+      rootStringIdx: 1,
+      offsets: [null, 0, -2, -1, -2, -3],
+      fingers: [null, 4, 2, 3, 1, 1],
+      intervals: [null, '1', 'b3', 'b5', 'bb7', 'b3'],
+      barre: true,
+      tipPt: 'Extensão em 5 cordas para cadências expressivas.',
+    },
+    {
+      shapeId: 'G',
+      shapeNamePt: 'Formato Gdim7 (Modelo Sol Diminuto — Raiz na 6ª corda)',
+      rootStringIdx: 0,
+      offsets: [0, null, -1, -3, -2, -4],
+      fingers: [4, null, 3, 2, 2, 1],
+      intervals: ['1', null, 'b5', '1', 'b3', 'bb7'],
+      barre: false,
+      tipPt: 'Ampla abertura diminuta interligando a região grave e média.',
+    },
+  ],
+};
+
+export interface GeneratedChordVoicing {
+  rootNoteEn: string;
+  chordName: string;
+  chordType: ChordTypeDefinition;
+  shapeId: 'C' | 'A' | 'G' | 'E' | 'D';
+  shapeNamePt: string;
+  frets: number[]; // 6 strings: -1 (mute), 0..19
+  fingers: (number | null)[];
+  intervalsByString: (string | null)[];
+  notesByString: (string | null)[];
+  rootStringIndex: number; // 0=6th, 1=5th, 2=4th
+  rootFret: number;
+  minFret: number;
+  maxFret: number;
+  barre: boolean;
+  barreFret: number | null;
+  tipPt: string;
+}
+
+/**
+ * Given any root note (e.g. "C", "F#", "Bb") and chord type (e.g. "maj7", "dom7"),
+ * calculates all 5 CAGED voicings with accurate frets, note names, and intervals.
+ */
+/**
+ * Helper to calculate how many semitones a string is altered from standard tuning (low-to-high index 0..5)
+ */
+function getTuningDeltaFromStandard(stringIdxLowToHigh: number, currentOpenNoteEn: string): number {
+  const STANDARD_LOW_TO_HIGH = ['E', 'A', 'D', 'G', 'B', 'E'];
+  const stdNote = STANDARD_LOW_TO_HIGH[stringIdxLowToHigh] || 'E';
+  const stdSemi = NOTE_TO_SEMITONE[stdNote] ?? 0;
+  const curSemi = NOTE_TO_SEMITONE[currentOpenNoteEn] ?? 0;
+  let delta = curSemi - stdSemi;
+  if (delta > 6) delta -= 12;
+  if (delta < -6) delta += 12;
+  return delta;
+}
+
+export function generateCagedVoicings(
+  rootNoteEn: string,
+  chordTypeId: string,
+  tuningNotes: string[] = ['E', 'A', 'D', 'G', 'B', 'E']
+): GeneratedChordVoicing[] {
+  const chordType = CHORD_TYPES.find((ct) => ct.id === chordTypeId) || CHORD_TYPES[0];
+  const templates = CAGED_VOICING_TEMPLATES[chordTypeId] || CAGED_VOICING_TEMPLATES['maior'];
+
+  // Convert tuningNotes from high-to-low (0 = 1st string, 5 = 6th string) to low-to-high (0 = 6th string, 5 = 1st string)
+  const lowToHighNotes = [...tuningNotes].reverse();
+
+  const results: GeneratedChordVoicing[] = [];
+
+  templates.forEach((tpl) => {
+    // 1. Determine which string has the root note for this CAGED shape
+    // rootStringIdx: 0 = 6th string E, 1 = 5th string A, 2 = 4th string D
+    const stringIdx = tpl.rootStringIdx; // 0, 1, or 2
+    const openNoteRoot = lowToHighNotes[stringIdx] || 'E';
+
+    // Find the fret where openNoteRoot matches rootNoteEn
+    let foundRootFret = 0;
+    for (let f = 0; f <= 15; f++) {
+      const info = getNoteAtFret(openNoteRoot, f);
+      if (info.noteEn === rootNoteEn) {
+        foundRootFret = f;
+        break;
+      }
+    }
+
+    const rootTuningDelta = getTuningDeltaFromStandard(tpl.rootStringIdx, openNoteRoot);
+
+    const validFrets: number[] = [];
+    const notesByString: (string | null)[] = [];
+    let minF = 999;
+    let maxF = -1;
+
+    // Calculate tuning shift for each string relative to root string in the chosen tuning
+    const stringShifts = tpl.offsets.map((off, idx) => {
+      if (off === null) return 0;
+      const strDelta = getTuningDeltaFromStandard(idx, lowToHighNotes[idx] || 'E');
+      return rootTuningDelta - strDelta;
+    });
+
+    // Check lowest offset among non-null strings
+    let lowestOffset = 0;
+    tpl.offsets.forEach((off, idx) => {
+      if (off !== null) {
+        const adjustedOff = off + stringShifts[idx];
+        if (adjustedOff < lowestOffset) {
+          lowestOffset = adjustedOff;
+        }
+      }
+    });
+
+    // Adjust octave if too low
+    if (foundRootFret + lowestOffset < 0) {
+      foundRootFret += 12;
+    }
+    // Or if it goes beyond fret 17, try -12 if possible
+    let highestOffset = 0;
+    tpl.offsets.forEach((off, idx) => {
+      if (off !== null) {
+        const adjustedOff = off + stringShifts[idx];
+        if (adjustedOff > highestOffset) {
+          highestOffset = adjustedOff;
+        }
+      }
+    });
+    if (foundRootFret + highestOffset > 16 && foundRootFret - 12 + lowestOffset >= 0) {
+      foundRootFret -= 12;
+    }
+
+    // Now calculate exact frets for each of the 6 strings
+    tpl.offsets.forEach((off, idx) => {
+      if (off === null) {
+        validFrets.push(-1);
+        notesByString.push(null);
+      } else {
+        const actualFret = Math.max(0, foundRootFret + off + stringShifts[idx]);
+        validFrets.push(actualFret);
+        const info = getNoteAtFret(lowToHighNotes[idx], actualFret);
+        notesByString.push(info.noteEn);
+        if (actualFret > 0 && actualFret < minF) {
+          minF = actualFret;
+        }
+        if (actualFret > maxF) {
+          maxF = actualFret;
+        }
+      }
+    });
+
+    if (minF === 999) minF = 0;
+    if (maxF === -1) maxF = 0;
+
+    // Determine barreFret if barre is true and minF > 0
+    const barreFret = tpl.barre && minF > 0 ? minF : null;
+
+    results.push({
+      rootNoteEn,
+      chordName: `${rootNoteEn}${chordType.suffix}`,
+      chordType,
+      shapeId: tpl.shapeId,
+      shapeNamePt: tpl.shapeNamePt,
+      frets: validFrets,
+      fingers: tpl.fingers,
+      intervalsByString: tpl.intervals,
+      notesByString,
+      rootStringIndex: tpl.rootStringIdx,
+      rootFret: foundRootFret,
+      minFret: minF,
+      maxFret: maxF,
+      barre: tpl.barre,
+      barreFret,
+      tipPt: tpl.tipPt,
+    });
+  });
+
+  return results;
+}
+
+export const ROOT_NOTES_LIST = [
+  { nameEn: 'C', namePt: 'Dó (C)', alt: '' },
+  { nameEn: 'C#', namePt: 'Dó# / Réb', alt: 'Db' },
+  { nameEn: 'D', namePt: 'Ré (D)', alt: '' },
+  { nameEn: 'D#', namePt: 'Ré# / Mib', alt: 'Eb' },
+  { nameEn: 'E', namePt: 'Mi (E)', alt: '' },
+  { nameEn: 'F', namePt: 'Fá (F)', alt: '' },
+  { nameEn: 'F#', namePt: 'Fá# / Solb', alt: 'Gb' },
+  { nameEn: 'G', namePt: 'Sol (G)', alt: '' },
+  { nameEn: 'G#', namePt: 'Sol# / Láb', alt: 'Ab' },
+  { nameEn: 'A', namePt: 'Lá (A)', alt: '' },
+  { nameEn: 'A#', namePt: 'Lá# / Sib', alt: 'Bb' },
+  { nameEn: 'B', namePt: 'Si (B)', alt: '' },
+];

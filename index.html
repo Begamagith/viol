@@ -1,0 +1,799 @@
+/**
+ * @license
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+import React, { useState, useMemo } from 'react';
+import { InstrumentType, NoteDisplayMode } from '../../types';
+import { Fretboard } from '../Fretboard';
+import { TUNINGS, CHROMATIC_EN } from '../../data/musicTheory';
+import {
+  CHORD_TYPES,
+  ROOT_NOTES_LIST,
+  generateCagedVoicings,
+  GeneratedChordVoicing,
+} from '../../data/chordDictionaryData';
+import { guitarAudio } from '../../lib/audio';
+import {
+  Layers,
+  Volume2,
+  Sparkles,
+  Music,
+  BookOpen,
+  Play,
+  Info,
+  Filter,
+  Eye,
+  Hash,
+  Grid,
+  CheckCircle2,
+  HelpCircle,
+} from 'lucide-react';
+
+interface ChordDictionaryProps {
+  instrument: InstrumentType;
+  tuningId: string;
+  displayMode: NoteDisplayMode;
+}
+
+type ChordCategory = 'all' | 'triads' | 'sevenths' | 'suspended_sixth' | 'ninths';
+
+export const ChordDictionary: React.FC<ChordDictionaryProps> = ({
+  instrument,
+  tuningId,
+  displayMode,
+}) => {
+  const [selectedRoot, setSelectedRoot] = useState<string>('C');
+  const [selectedChordType, setSelectedChordType] = useState<string>('maior');
+  const [selectedShapeId, setSelectedShapeId] = useState<'E' | 'A' | 'D' | 'C' | 'G'>('E');
+  const [showAllNeckTones, setShowAllNeckTones] = useState<boolean>(false);
+  const [diagramMode, setDiagramMode] = useState<'fingers' | 'intervals'>('fingers');
+  const [activeCategory, setActiveCategory] = useState<ChordCategory>('all');
+
+  const currentTuning = TUNINGS.find((t) => t.id === tuningId) || TUNINGS[0];
+
+  // Category filter mapping
+  const filteredChordTypes = useMemo(() => {
+    if (activeCategory === 'all') return CHORD_TYPES;
+    if (activeCategory === 'triads') {
+      return CHORD_TYPES.filter((c) => ['maior', 'menor', 'aug', 'dim'].includes(c.id));
+    }
+    if (activeCategory === 'sevenths') {
+      return CHORD_TYPES.filter((c) => ['maj7', 'm7', 'dom7', 'm7b5', 'dim7'].includes(c.id));
+    }
+    if (activeCategory === 'suspended_sixth') {
+      return CHORD_TYPES.filter((c) => ['sus4', 'sus2', '6', 'm6'].includes(c.id));
+    }
+    if (activeCategory === 'ninths') {
+      return CHORD_TYPES.filter((c) => ['add9', '9', 'maj9', 'm9'].includes(c.id));
+    }
+    return CHORD_TYPES;
+  }, [activeCategory]);
+
+  // Ensure current chord type is valid when switching categories
+  React.useEffect(() => {
+    const exists = filteredChordTypes.some((c) => c.id === selectedChordType);
+    if (!exists && filteredChordTypes.length > 0) {
+      setSelectedChordType(filteredChordTypes[0].id);
+    }
+  }, [filteredChordTypes, selectedChordType]);
+
+  // Calculate the 5 CAGED voicings for this root and chordType
+  const allVoicings = useMemo(() => {
+    return generateCagedVoicings(selectedRoot, selectedChordType, currentTuning.notes);
+  }, [selectedRoot, selectedChordType, currentTuning]);
+
+  // The active voicing (if a specific shape is selected)
+  const activeVoicing: GeneratedChordVoicing = useMemo(() => {
+    return allVoicings.find((v) => v.shapeId === selectedShapeId) || allVoicings[0];
+  }, [allVoicings, selectedShapeId]);
+
+  // Play chord strum (from lowest string to highest string)
+  const handlePlayStrum = (voicing: GeneratedChordVoicing) => {
+    guitarAudio.playChord(voicing.frets, currentTuning.notes, instrument);
+  };
+
+  // Play chord arpeggio (each note sequentially)
+  const handlePlayArpeggio = (voicing: GeneratedChordVoicing) => {
+    voicing.frets.forEach((fret, idx) => {
+      if (fret >= 0) {
+        setTimeout(() => {
+          guitarAudio.playNoteOnString(idx, fret, currentTuning.notes, instrument, 1.8);
+        }, (5 - idx) * 140); // 140ms step from string 6 to string 1
+      }
+    });
+  };
+
+  // Build notes for Fretboard component
+  const fretboardNotes = useMemo(() => {
+    const list: {
+      stringIndex: number;
+      fretNumber: number;
+      isRoot: boolean;
+      color: 'amber' | 'emerald' | 'blue' | 'purple' | 'rose' | 'slate';
+      label: string;
+      interval?: string;
+    }[] = [];
+
+    if (showAllNeckTones) {
+      // Show every occurrence of the chord intervals across all frets 0..15
+      const chordNotesSet = new Set<string>();
+      activeVoicing.notesByString.forEach((note) => {
+        if (note) chordNotesSet.add(note);
+      });
+
+      for (let s = 0; s < 6; s++) {
+        for (let f = 0; f <= 15; f++) {
+          const openNote = currentTuning.notes[s];
+          const chromaticIdx = CHROMATIC_EN.indexOf(openNote);
+          const noteIdx = (chromaticIdx + f) % 12;
+          const noteEn = CHROMATIC_EN[noteIdx];
+
+          if (chordNotesSet.has(noteEn)) {
+            const isRoot = noteEn === selectedRoot;
+            let color: 'amber' | 'emerald' | 'blue' | 'purple' | 'rose' | 'slate' = 'slate';
+            let interval = '';
+
+            // Map interval color
+            const matchIdx = activeVoicing.notesByString.indexOf(noteEn);
+            if (matchIdx !== -1 && activeVoicing.intervalsByString[matchIdx]) {
+              interval = activeVoicing.intervalsByString[matchIdx] || '';
+              if (interval === '1') color = 'amber';
+              else if (interval.includes('3')) color = 'emerald';
+              else if (interval.includes('5')) color = 'blue';
+              else if (interval.includes('7')) color = 'purple';
+              else color = 'rose';
+            }
+
+            list.push({
+              stringIndex: s,
+              fretNumber: f,
+              isRoot,
+              color,
+              label: noteEn,
+              interval: interval || noteEn,
+            });
+          }
+        }
+      }
+    } else {
+      // Show ONLY the selected CAGED shape
+      activeVoicing.frets.forEach((fret, sIdx) => {
+        if (fret >= 0) {
+          const isRoot = activeVoicing.notesByString[sIdx] === selectedRoot;
+          const interval = activeVoicing.intervalsByString[sIdx] || '';
+          const noteEn = activeVoicing.notesByString[sIdx] || '';
+
+          let color: 'amber' | 'emerald' | 'blue' | 'purple' | 'rose' | 'slate' = 'slate';
+          if (interval === '1') color = 'amber';
+          else if (interval.includes('3')) color = 'emerald';
+          else if (interval.includes('5')) color = 'blue';
+          else if (interval.includes('7')) color = 'purple';
+          else color = 'rose';
+
+          list.push({
+            stringIndex: 5 - sIdx,
+            fretNumber: fret,
+            isRoot,
+            color,
+            label: noteEn,
+            interval,
+          });
+        }
+      });
+    }
+
+    return list;
+  }, [showAllNeckTones, activeVoicing, selectedRoot, currentTuning]);
+
+  // Calculate distinct real note names of the chord
+  const uniqueChordNotes = useMemo(() => {
+    const set = new Set<string>();
+    activeVoicing.notesByString.forEach((n) => {
+      if (n) set.add(n);
+    });
+    return Array.from(set);
+  }, [activeVoicing]);
+
+  // Helper for rendering vertical chord diagram
+  const renderVerticalChordDiagram = (voicing: GeneratedChordVoicing) => {
+    const numFrets = 5;
+    const startFret = voicing.minFret === 0 ? 1 : Math.max(1, voicing.minFret - 1);
+    const isOpenNut = startFret === 1;
+
+    const width = 280;
+    const height = 320;
+    const padTop = 50;
+    const padLeft = 45;
+    const gridWidth = width - padLeft - 25;
+    const gridHeight = height - padTop - 35;
+    const stringStep = gridWidth / 5;
+    const fretStep = gridHeight / numFrets;
+
+    return (
+      <svg
+        viewBox={`0 0 ${width} ${height}`}
+        className="w-full max-w-[280px] mx-auto select-none overflow-visible"
+      >
+        {/* Top Muted (X) and Open (O) indicators */}
+        {voicing.frets.map((fret, stringIdx) => {
+          const x = padLeft + stringIdx * stringStep;
+          if (fret === -1) {
+            return (
+              <g key={`top-mute-${stringIdx}`} className="cursor-pointer">
+                <text
+                  x={x}
+                  y={padTop - 14}
+                  textAnchor="middle"
+                  className="text-sm font-extrabold fill-rose-400"
+                >
+                  X
+                </text>
+              </g>
+            );
+          } else if (fret === 0) {
+            return (
+              <g
+                key={`top-open-${stringIdx}`}
+                className="cursor-pointer"
+                onClick={() =>
+                  guitarAudio.playNoteOnString(stringIdx, 0, currentTuning.notes, instrument, 1.5)
+                }
+              >
+                <circle
+                  cx={x}
+                  cy={padTop - 16}
+                  r={6}
+                  className="fill-amber-500/20 stroke-amber-400 stroke-2 hover:fill-amber-400/50 transition-all"
+                />
+                <title>Corda {6 - stringIdx} solta (clique para ouvir)</title>
+              </g>
+            );
+          }
+          return null;
+        })}
+
+        {/* Nut line or Fret indicator */}
+        {isOpenNut ? (
+          <line
+            x1={padLeft}
+            y1={padTop}
+            x2={padLeft + gridWidth}
+            y2={padTop}
+            stroke="#ffffff"
+            strokeWidth={6}
+            strokeLinecap="round"
+          />
+        ) : (
+          <>
+            <text
+              x={padLeft - 12}
+              y={padTop + fretStep * 0.6}
+              textAnchor="end"
+              className="text-xs font-bold fill-amber-400"
+            >
+              {startFret}ª
+            </text>
+            <line
+              x1={padLeft}
+              y1={padTop}
+              x2={padLeft + gridWidth}
+              y2={padTop}
+              stroke="#57534e"
+              strokeWidth={2}
+            />
+          </>
+        )}
+
+        {/* Horizontal Fret Lines */}
+        {Array.from({ length: numFrets + 1 }).map((_, fIdx) => {
+          if (isOpenNut && fIdx === 0) return null;
+          const y = padTop + fIdx * fretStep;
+          return (
+            <line
+              key={`fret-line-${fIdx}`}
+              x1={padLeft}
+              y1={y}
+              x2={padLeft + gridWidth}
+              y2={y}
+              stroke="#57534e"
+              strokeWidth={1.5}
+            />
+          );
+        })}
+
+        {/* Vertical String Lines (E A D G B e) */}
+        {Array.from({ length: 6 }).map((_, sIdx) => {
+          const x = padLeft + sIdx * stringStep;
+          return (
+            <line
+              key={`str-line-${sIdx}`}
+              x1={x}
+              y1={padTop}
+              x2={x}
+              y2={padTop + gridHeight}
+              stroke="#78716c"
+              strokeWidth={sIdx < 3 ? 2.5 : 1.5}
+            />
+          );
+        })}
+
+        {/* Barre / Pestana indicator */}
+        {voicing.barre && voicing.barreFret && voicing.barreFret >= startFret && (
+          (() => {
+            const barreFretRel = voicing.barreFret - startFret;
+            if (barreFretRel >= 0 && barreFretRel < numFrets) {
+              let firstStr = 0;
+              let lastStr = 5;
+              for (let s = 0; s < 6; s++) {
+                if (voicing.frets[s] === voicing.barreFret) {
+                  firstStr = s;
+                  break;
+                }
+              }
+              for (let s = 5; s >= 0; s--) {
+                if (voicing.frets[s] === voicing.barreFret) {
+                  lastStr = s;
+                  break;
+                }
+              }
+              if (lastStr > firstStr) {
+                const y = padTop + (barreFretRel + 0.5) * fretStep;
+                const x1 = padLeft + firstStr * stringStep;
+                const x2 = padLeft + lastStr * stringStep;
+                return (
+                  <g key="barre-group">
+                    <line
+                      x1={x1}
+                      y1={y}
+                      x2={x2}
+                      y2={y}
+                      stroke="#f59e0b"
+                      strokeWidth={18}
+                      strokeLinecap="round"
+                      opacity={0.35}
+                    />
+                    <text
+                      x={padLeft - 10}
+                      y={y + 4}
+                      textAnchor="end"
+                      className="text-[10px] font-bold fill-amber-300"
+                    >
+                      Pestana
+                    </text>
+                  </g>
+                );
+              }
+            }
+            return null;
+          })()
+        )}
+
+        {/* Note Circles on Frets */}
+        {voicing.frets.map((fret, sIdx) => {
+          if (fret < startFret || fret >= startFret + numFrets) return null;
+          const fretRel = fret - startFret;
+          const x = padLeft + sIdx * stringStep;
+          const y = padTop + (fretRel + 0.5) * fretStep;
+
+          const isRoot = voicing.notesByString[sIdx] === selectedRoot;
+          const interval = voicing.intervalsByString[sIdx] || '';
+          const noteEn = voicing.notesByString[sIdx] || '';
+          const finger = voicing.fingers[sIdx];
+
+          let circleFill = '#334155'; // slate
+          if (isRoot) circleFill = '#f59e0b'; // amber
+          else if (interval.includes('3')) circleFill = '#10b981'; // emerald
+          else if (interval.includes('5')) circleFill = '#3b82f6'; // blue
+          else if (interval.includes('7')) circleFill = '#8b5cf6'; // purple
+          else if (interval.includes('9') || interval.includes('2') || interval.includes('6'))
+            circleFill = '#ec4899'; // pink
+
+          const displayLabel =
+            diagramMode === 'fingers'
+              ? finger
+                ? `${finger}`
+                : isRoot
+                ? 'R'
+                : '•'
+              : interval || noteEn;
+
+          return (
+            <g
+              key={`note-circle-${sIdx}`}
+              className="cursor-pointer transition-transform hover:scale-110"
+              onClick={() =>
+                guitarAudio.playNoteOnString(sIdx, fret, currentTuning.notes, instrument, 1.8)
+              }
+            >
+              <circle
+                cx={x}
+                cy={y}
+                r={13}
+                fill={circleFill}
+                stroke={isRoot ? '#ffffff' : '#0f172a'}
+                strokeWidth={isRoot ? 2.5 : 1.5}
+                className="shadow-md"
+              />
+              <text
+                x={x}
+                y={y + 4}
+                textAnchor="middle"
+                className={`text-xs font-black select-none ${
+                  isRoot ? 'fill-stone-950' : 'fill-white'
+                }`}
+              >
+                {displayLabel}
+              </text>
+              <title>
+                {noteEn} ({interval}) • Corda {6 - sIdx}, Casa {fret} (clique para ouvir)
+              </title>
+            </g>
+          );
+        })}
+
+        {/* String names footer */}
+        {Array.from({ length: 6 }).map((_, sIdx) => {
+          const x = padLeft + sIdx * stringStep;
+          return (
+            <text
+              key={`str-label-${sIdx}`}
+              x={x}
+              y={height - 8}
+              textAnchor="middle"
+              className="text-[11px] font-bold fill-stone-500 uppercase"
+            >
+              {currentTuning.notes[5 - sIdx]}
+            </text>
+          );
+        })}
+      </svg>
+    );
+  };
+
+  return (
+    <div className="space-y-8 pb-16">
+      {/* Top Banner */}
+      <div className="bg-gradient-to-r from-amber-900/40 via-stone-900 to-stone-900 p-6 sm:p-8 rounded-3xl border border-amber-500/20 shadow-xl flex flex-col md:flex-row md:items-center justify-between gap-6">
+        <div>
+          <div className="flex flex-wrap items-center gap-2 mb-3">
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-amber-500/10 border border-amber-500/30 text-amber-400 text-xs font-bold uppercase tracking-wider">
+              <Sparkles className="w-3.5 h-3.5" />
+              Dicionário Completo de Acordes
+            </div>
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-stone-800/90 border border-stone-700 text-stone-300 text-xs font-bold uppercase tracking-wider">
+              Afinação: <span className="text-amber-400">{currentTuning.name} ({[...currentTuning.notes].reverse().join('-')})</span>
+            </div>
+          </div>
+          <h2 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight">
+            Acordes, Cifras & Sistema <span className="text-amber-400">CAGED</span>
+          </h2>
+          <p className="text-stone-300 text-sm sm:text-base max-w-2xl mt-1">
+            Explore 17 tipos de acordes em todos os tons. Visualize o diagrama vertical com
+            pestanas, escute o arpejo e domine as 5 posições ao longo de todo o braço.
+          </p>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-3">
+          <button
+            onClick={() => handlePlayStrum(activeVoicing)}
+            className="flex items-center gap-2 px-5 py-3 rounded-xl bg-amber-500 hover:bg-amber-400 text-stone-950 font-bold text-sm transition-all shadow-lg hover:scale-105 active:scale-95"
+          >
+            <Volume2 className="w-4 h-4" />
+            Batida (Strum)
+          </button>
+          <button
+            onClick={() => handlePlayArpeggio(activeVoicing)}
+            className="flex items-center gap-2 px-5 py-3 rounded-xl bg-stone-800 hover:bg-stone-700 text-amber-400 border border-stone-700 font-bold text-sm transition-all shadow-md hover:scale-105"
+          >
+            <Play className="w-4 h-4" />
+            Arpejar Acorde
+          </button>
+        </div>
+      </div>
+
+      {/* Control Panel: Categories, Root Note, Chord Type, and Shape */}
+      <div className="bg-stone-900/90 p-5 sm:p-6 rounded-2xl border border-stone-800 shadow-md space-y-6">
+        {/* Category Tabs */}
+        <div className="flex flex-wrap gap-2 border-b border-stone-800 pb-4">
+          {[
+            { id: 'all', label: 'Todos os Acordes' },
+            { id: 'triads', label: 'Tríades Básicas' },
+            { id: 'sevenths', label: 'Tétrades (Com 7ª)' },
+            { id: 'suspended_sixth', label: 'Suspensos & 6ª' },
+            { id: 'ninths', label: 'Com Nona/Tensões' },
+          ].map((cat) => {
+            const isSelected = activeCategory === cat.id;
+            return (
+              <button
+                key={cat.id}
+                onClick={() => setActiveCategory(cat.id as ChordCategory)}
+                className={`px-3.5 py-1.5 rounded-lg text-xs sm:text-sm font-bold transition-all ${
+                  isSelected
+                    ? 'bg-amber-500 text-stone-950 shadow-md'
+                    : 'bg-stone-800/80 text-stone-400 hover:text-white hover:bg-stone-800'
+                }`}
+              >
+                {cat.label}
+              </button>
+            );
+          })}
+        </div>
+
+        {/* 1. Root Note */}
+        <div className="space-y-2">
+          <label className="text-xs font-bold text-stone-400 uppercase tracking-wider block">
+            1. Nota Raiz (Tônica)
+          </label>
+          <div className="flex flex-wrap gap-1.5 sm:gap-2">
+            {ROOT_NOTES_LIST.map((root) => {
+              const isSelected = selectedRoot === root.nameEn;
+              return (
+                <button
+                  key={root.nameEn}
+                  onClick={() => {
+                    setSelectedRoot(root.nameEn);
+                    guitarAudio.playTone(261.63, instrument, 0.3, 0);
+                  }}
+                  className={`px-3 py-1.5 rounded-lg font-bold text-xs sm:text-sm transition-all ${
+                    isSelected
+                      ? 'bg-amber-500 text-stone-950 shadow-lg scale-105'
+                      : 'bg-stone-800 text-stone-300 hover:bg-stone-700 hover:text-white'
+                  }`}
+                >
+                  {root.nameEn}
+                  {root.alt && <span className="text-[10px] opacity-80 ml-1">/{root.alt}</span>}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* 2. Chord Quality */}
+        <div className="space-y-2">
+          <label className="text-xs font-bold text-stone-400 uppercase tracking-wider block">
+            2. Tipo de Acorde (Fórmula & Qualidade)
+          </label>
+          <div className="flex flex-wrap gap-1.5 sm:gap-2">
+            {filteredChordTypes.map((ct) => {
+              const isSelected = selectedChordType === ct.id;
+              return (
+                <button
+                  key={ct.id}
+                  onClick={() => {
+                    setSelectedChordType(ct.id);
+                  }}
+                  className={`px-3 py-1.5 rounded-lg font-semibold text-xs sm:text-sm transition-all ${
+                    isSelected
+                      ? 'bg-amber-600 text-white shadow-lg ring-2 ring-amber-400/50'
+                      : 'bg-stone-800 text-stone-300 hover:bg-stone-700 hover:text-white'
+                  }`}
+                >
+                  {ct.namePt}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* 3. CAGED Shape Selector */}
+        <div className="space-y-2">
+          <div className="flex items-center justify-between">
+            <label className="text-xs font-bold text-stone-400 uppercase tracking-wider block">
+              3. Formato CAGED (5 Posições ao Longo do Braço)
+            </label>
+            <span className="text-xs text-amber-400 font-semibold hidden sm:inline">
+              C • A • G • E • D
+            </span>
+          </div>
+          <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
+            {(['E', 'A', 'D', 'C', 'G'] as const).map((shape) => {
+              const isSelected = selectedShapeId === shape;
+              const matchingVoicing = allVoicings.find((v) => v.shapeId === shape);
+              const fretLabel = matchingVoicing
+                ? `Casa ${matchingVoicing.minFret === 0 ? 'Aberta (1ª)' : matchingVoicing.minFret + 'ª'}`
+                : '';
+
+              return (
+                <button
+                  key={shape}
+                  onClick={() => setSelectedShapeId(shape)}
+                  className={`px-3.5 py-2.5 rounded-xl font-bold text-xs sm:text-sm border transition-all text-left flex flex-col justify-between ${
+                    isSelected
+                      ? 'bg-stone-800 border-amber-500 text-amber-400 shadow-md ring-1 ring-amber-500/50'
+                      : 'bg-stone-900/60 border-stone-800 text-stone-300 hover:border-stone-700'
+                  }`}
+                >
+                  <div className="flex items-center justify-between w-full">
+                    <span className="font-extrabold text-base">Formato {shape}</span>
+                    {matchingVoicing?.barre && (
+                      <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 font-semibold">
+                        Pestana
+                      </span>
+                    )}
+                  </div>
+                  <span className="text-[11px] text-stone-400 font-normal mt-1">
+                    {fretLabel}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+
+      {/* Main Double Visualizer: Left (Vertical Chord Chart) + Right (Horizontal Fretboard & Info) */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+        {/* Left Column: Vertical Diagram Card (5 cols) */}
+        <div className="lg:col-span-5 bg-stone-900 p-6 rounded-3xl border border-stone-800 shadow-xl space-y-6">
+          <div className="flex items-center justify-between border-b border-stone-800 pb-4">
+            <div>
+              <span className="text-xs font-bold text-amber-400 uppercase tracking-wider block">
+                Cifra Visual
+              </span>
+              <h3 className="text-2xl font-black text-white">
+                {activeVoicing.chordName} <span className="text-sm font-normal text-stone-400">({activeVoicing.shapeId} Shape)</span>
+              </h3>
+            </div>
+
+            {/* Toggle Diagram Display Mode */}
+            <div className="flex items-center bg-stone-800 rounded-lg p-0.5 border border-stone-700">
+              <button
+                onClick={() => setDiagramMode('fingers')}
+                className={`px-2.5 py-1 rounded-md text-xs font-bold transition-all ${
+                  diagramMode === 'fingers'
+                    ? 'bg-amber-500 text-stone-950'
+                    : 'text-stone-400 hover:text-white'
+                }`}
+                title="Mostrar número dos dedos"
+              >
+                Dedos
+              </button>
+              <button
+                onClick={() => setDiagramMode('intervals')}
+                className={`px-2.5 py-1 rounded-md text-xs font-bold transition-all ${
+                  diagramMode === 'intervals'
+                    ? 'bg-amber-500 text-stone-950'
+                    : 'text-stone-400 hover:text-white'
+                }`}
+                title="Mostrar notas/graus do acorde"
+              >
+                Graus
+              </button>
+            </div>
+          </div>
+
+          {/* Render Vertical Chord SVG */}
+          <div className="py-2 bg-stone-950/60 rounded-2xl border border-stone-800/80 p-4">
+            {renderVerticalChordDiagram(activeVoicing)}
+          </div>
+
+          {/* Quick Note & Audio Instructions */}
+          <div className="text-center space-y-2">
+            <p className="text-xs text-stone-400">
+              💡 <strong className="text-stone-300">Clique em qualquer nota</strong> do diagrama para
+              ouvir a corda individual.
+            </p>
+            <div className="flex items-center justify-center gap-2 pt-1">
+              <span className="inline-block w-3 h-3 rounded-full bg-amber-500"></span>
+              <span className="text-xs text-stone-300">Tônica ({selectedRoot})</span>
+              <span className="inline-block w-3 h-3 rounded-full bg-emerald-500 ml-2"></span>
+              <span className="text-xs text-stone-300">3ª</span>
+              <span className="inline-block w-3 h-3 rounded-full bg-blue-500 ml-2"></span>
+              <span className="text-xs text-stone-300">5ª</span>
+              <span className="inline-block w-3 h-3 rounded-full bg-purple-500 ml-2"></span>
+              <span className="text-xs text-stone-300">7ª/Tensões</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Right Column: Fretboard View + Harmonic X-Ray (7 cols) */}
+        <div className="lg:col-span-7 space-y-6">
+          {/* Fretboard Card */}
+          <div className="bg-stone-900 p-6 rounded-3xl border border-stone-800 shadow-xl space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div>
+                <span className="text-xs font-bold text-amber-400 uppercase tracking-wider block">
+                  Braço do Instrumento
+                </span>
+                <h4 className="text-lg font-extrabold text-white">
+                  {showAllNeckTones
+                    ? `Mapeamento Completo de ${activeVoicing.chordName}`
+                    : `Posição do Formato ${activeVoicing.shapeId}`}
+                </h4>
+              </div>
+
+              {/* Toggle show all neck vs single voicing */}
+              <button
+                onClick={() => setShowAllNeckTones(!showAllNeckTones)}
+                className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold border transition-all ${
+                  showAllNeckTones
+                    ? 'bg-amber-500/20 border-amber-500/50 text-amber-300'
+                    : 'bg-stone-800 border-stone-700 text-stone-300 hover:border-stone-600'
+                }`}
+              >
+                <Grid className="w-3.5 h-3.5" />
+                {showAllNeckTones ? 'Ver Só Esta Posição' : 'Mapear em Todo o Braço (0-15)'}
+              </button>
+            </div>
+
+            {/* Fretboard component */}
+            <div className="bg-stone-950/80 p-3 sm:p-4 rounded-2xl border border-stone-800 overflow-x-auto">
+              <Fretboard
+                notes={fretboardNotes}
+                displayMode={displayMode}
+                numFrets={15}
+                instrument={instrument}
+                tuningNotes={currentTuning.notes}
+              />
+            </div>
+          </div>
+
+          {/* Harmonic X-Ray & Practical Guide Panel */}
+          <div className="bg-stone-900 p-6 rounded-3xl border border-stone-800 shadow-xl space-y-5">
+            <div className="flex items-center gap-2 border-b border-stone-800 pb-3">
+              <BookOpen className="w-5 h-5 text-amber-400" />
+              <h4 className="text-base font-extrabold text-white">
+                Raio-X Harmônico & Dicas Práticas
+              </h4>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <div className="bg-stone-950/60 p-3.5 rounded-2xl border border-stone-800">
+                <span className="text-xs font-bold text-stone-400 block mb-1">
+                  Fórmula Intervalar
+                </span>
+                <span className="text-base font-black text-amber-400">
+                  {activeVoicing.chordType.formula}
+                </span>
+              </div>
+
+              <div className="bg-stone-950/60 p-3.5 rounded-2xl border border-stone-800">
+                <span className="text-xs font-bold text-stone-400 block mb-1">
+                  Notas Reais na Cifra
+                </span>
+                <span className="text-base font-black text-white">
+                  {uniqueChordNotes.join(' • ')}
+                </span>
+              </div>
+
+              <div className="bg-stone-950/60 p-3.5 rounded-2xl border border-stone-800">
+                <span className="text-xs font-bold text-stone-400 block mb-1">
+                  Sensaçao / Clima
+                </span>
+                <span className="text-sm font-semibold text-emerald-400">
+                  {activeVoicing.chordType.moodPt}
+                </span>
+              </div>
+            </div>
+
+            {/* Description & Genres */}
+            <div className="space-y-2 text-sm text-stone-300">
+              <p>
+                <strong className="text-amber-400">Sobre o Acorde: </strong>
+                {activeVoicing.chordType.descriptionPt}
+              </p>
+              <p>
+                <strong className="text-amber-400">Estilos mais comuns: </strong>
+                {activeVoicing.chordType.genrePt}
+              </p>
+            </div>
+
+            {/* Shape Execution Tip */}
+            {activeVoicing.tipPt && (
+              <div className="p-4 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-amber-300 text-xs sm:text-sm flex items-start gap-3">
+                <Info className="w-5 h-5 text-amber-400 flex-shrink-0 mt-0.5" />
+                <div>
+                  <strong className="font-bold block text-amber-200 mb-0.5">
+                    Dica de Execução para o Formato {activeVoicing.shapeId}:
+                  </strong>
+                  <span>{activeVoicing.tipPt}</span>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
