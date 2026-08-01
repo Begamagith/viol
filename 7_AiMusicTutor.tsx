@@ -31,6 +31,7 @@ import {
   ChevronRight,
   Download,
   WifiOff,
+  Radio,
 } from 'lucide-react';
 import { usePWA } from '../hooks/usePWA';
 import { PwaInstallModal } from './PwaInstallModal';
@@ -123,6 +124,13 @@ export const Navbar: React.FC<NavbarProps> = ({
       label: 'Campo Harmônico',
       icon: ListMusic,
       description: 'Funções harmônicas, acordes e progressões por tonalidade',
+    },
+    {
+      id: 'tuner',
+      label: 'Afinador',
+      icon: Radio,
+      highlight: true,
+      description: 'Afinador cromático por microfone em tempo real e referências sonoras por corda',
     },
     {
       id: 'quiz',

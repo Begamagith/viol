@@ -15,9 +15,10 @@ import { ScalesAndModes } from './components/modules/4_ScalesAndModes';
 import { HarmonicField } from './components/modules/5_HarmonicField';
 import { QuizTrainer } from './components/modules/6_QuizTrainer';
 import { AiMusicTutor } from './components/modules/7_AiMusicTutor';
+import { GuitarTuner } from './components/modules/10_GuitarTuner';
 import { TUNINGS } from './data/musicTheory';
 import { guitarAudio } from './lib/audio';
-import { Guitar, Volume2, HelpCircle } from 'lucide-react';
+import { Guitar, Volume2, HelpCircle, Radio } from 'lucide-react';
 
 export default function App() {
   const [activeTab, setActiveTab] = useState<string>('notes');
@@ -58,14 +59,29 @@ export default function App() {
             <span className="text-stone-500 hidden sm:inline">— {currentTuning.description}</span>
           </div>
 
-          <button
-            onClick={handlePlayOpenStrings}
-            className="flex items-center space-x-2 px-4 py-1.5 bg-stone-800 hover:bg-amber-500 hover:text-stone-950 font-bold rounded-lg border border-stone-700 transition-all text-amber-400"
-            title="Tocar todas as cordas soltas desta afinação"
-          >
-            <Volume2 className="w-4 h-4" />
-            <span>Ouvir Cordas Soltas ({currentTuning.notes.join(' - ')})</span>
-          </button>
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              onClick={() => setActiveTab('tuner')}
+              className={`flex items-center space-x-2 px-3.5 py-1.5 font-bold rounded-lg border transition-all ${
+                activeTab === 'tuner'
+                  ? 'bg-amber-500 text-stone-950 border-amber-400 shadow-md'
+                  : 'bg-stone-800/90 text-amber-400 hover:bg-amber-500 hover:text-stone-950 border-amber-500/30'
+              }`}
+              title="Abrir Afinador interativo (por microfone ou por cordas soltas)"
+            >
+              <Radio className="w-4 h-4" />
+              <span>Afinador</span>
+            </button>
+
+            <button
+              onClick={handlePlayOpenStrings}
+              className="flex items-center space-x-2 px-4 py-1.5 bg-stone-800 hover:bg-amber-500 hover:text-stone-950 font-bold rounded-lg border border-stone-700 transition-all text-amber-400"
+              title="Tocar todas as cordas soltas desta afinação"
+            >
+              <Volume2 className="w-4 h-4" />
+              <span>Ouvir Cordas ({currentTuning.notes.join('-')})</span>
+            </button>
+          </div>
         </div>
 
         {/* Dynamic Module Rendering */}
@@ -137,6 +153,15 @@ export default function App() {
             <AiMusicTutor
               instrument={instrument}
               tuningId={tuningId}
+            />
+          )}
+
+          {activeTab === 'tuner' && (
+            <GuitarTuner
+              instrument={instrument}
+              tuningId={tuningId}
+              setTuningId={setTuningId}
+              displayMode={displayMode}
             />
           )}
         </div>
